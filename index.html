@@ -69,6 +69,17 @@ main{padding:22px 0 42px}.panel{background:#fff;border:1px solid var(--line);bor
 @media(max-width:430px){.whatsapp-float{right:12px;bottom:12px;width:58px;height:58px}}
 .payment-brand-image{display:block;width:105px;max-width:100%;height:62px;object-fit:contain;border-radius:5px}.pay.breb .payment-brand-image{width:135px}.pay{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .pay-choice{cursor:pointer;color:inherit;font:inherit;text-align:left}.pay-choice:focus-visible{outline:3px solid #b28a37;outline-offset:3px}.pay-choice.active{border:2px solid #b28a37;background:#fff8e8}.payment-details{display:none;margin-top:14px;padding:15px;border:1px solid #d8c79f;border-radius:12px;background:#fffdf7}.payment-details.show{display:block}.payment-details strong{font-size:20px;color:#6e5520;letter-spacing:.04em}.payment-details .copy-number{margin-left:8px;border:0;border-radius:8px;padding:8px 11px;background:#171717;color:#fff;font-weight:800;cursor:pointer}
+
+/* Ventana de selección de método de pago */
+.payment-modal{display:none;position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.72);padding:18px;align-items:center;justify-content:center}
+.payment-modal.show{display:flex}
+.payment-modal-card{width:min(100%,440px);max-height:90vh;overflow:auto;background:#fffdf7;border:1px solid #d8c79f;border-radius:18px;padding:22px;box-shadow:0 18px 60px #0006;color:#211d15}
+.payment-modal-card h2{margin:0 0 8px;color:#6e5520}.payment-modal-card p{line-height:1.5;color:#665f52}
+.payment-modal-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+.payment-modal-options button{border:2px solid #d8c79f;border-radius:12px;padding:14px 8px;background:#fff;font-weight:900;font-size:16px;color:#5e4819;cursor:pointer}
+.payment-modal-options button.active{border-color:#b28a37;background:#fff3d4}
+.payment-modal-detail{display:none;border:1px solid #d8c79f;border-radius:12px;padding:14px;background:#fff;margin:12px 0}.payment-modal-detail.show{display:block}.payment-modal-detail strong{display:block;font-size:22px;color:#6e5520;margin:6px 0}
+.payment-modal-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.payment-modal-actions button{flex:1;min-width:130px}
 </style>
 </head>
 <body>
@@ -157,6 +168,21 @@ main{padding:22px 0 42px}.panel{background:#fff;border:1px solid var(--line);bor
   </section>
   <footer class="foot">Lotería de Bogotá · Sitio en preparación.<br>Antes de ofrecer, promocionar o vender una rifa o juego de suerte y azar, verifica la autorización y los requisitos legales aplicables en Colombia. Esta página no afirma estar autorizada ni respaldada por una entidad pública.</footer>
 </main>
+<div class="payment-modal" id="payment-method-modal" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
+  <div class="payment-modal-card">
+    <h2 id="payment-modal-title">Elige cómo deseas pagar</h2>
+    <p>Selecciona un método para consultar los datos de pago antes de adjuntar tu comprobante.</p>
+    <div class="payment-modal-options">
+      <button type="button" data-modal-method="nequi">Nequi</button>
+      <button type="button" data-modal-method="breb">BRE-B</button>
+    </div>
+    <div class="payment-modal-detail" id="payment-modal-detail" aria-live="polite"></div>
+    <div class="payment-modal-actions">
+      <button class="btn" type="button" id="payment-modal-cancel">Cancelar</button>
+      <button class="btn gold" type="button" id="payment-modal-continue" disabled>Continuar</button>
+    </div>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // Cliente Supabase: la clave publishable es pública y está protegida por RLS.
@@ -180,7 +206,34 @@ async function loadAvailability(){const {data,error}=await db.from('raffle_numbe
 grid.addEventListener('click',e=>{const b=e.target.closest('button[data-number]');if(!b||b.disabled)return;const n=Number(b.dataset.number);if(selected.has(n))selected.delete(n);else selected.add(n);paintNumber(n);updateSummary()});
 search.addEventListener('input',()=>{const q=search.value.replace(/\D/g,'').slice(0,4);grid.querySelectorAll('.num').forEach(b=>{b.hidden=!!q&&!b.dataset.number.padStart(4,'0').includes(q)})});
 document.querySelector('#clear').onclick=()=>{search.value='';grid.querySelectorAll('.num').forEach(b=>b.hidden=false)};
-document.querySelector('#request').onclick=()=>{const first=document.querySelector('#first-name').value.trim(),last=document.querySelector('#last-name').value.trim(),doc=document.querySelector('#document-id').value.trim(),consent=document.querySelector('#data-consent').checked;if(!first||!last||!doc||!consent){alert('Completa nombre, apellido y cédula, y autoriza el uso de tus datos para continuar.');return}document.querySelector('#payment-proof').classList.add('show');document.querySelector('#payment-proof').scrollIntoView({behavior:'smooth',block:'center'});};
+let chosenPaymentMethod=null;
+const paymentModal=document.querySelector('#payment-method-modal');
+const modalDetail=document.querySelector('#payment-modal-detail');
+const modalContinue=document.querySelector('#payment-modal-continue');
+const modalPaymentInfo={nequi:{name:'Nequi',number:'3248448958'},breb:{name:'BRE-B',number:'3248448958'}};
+document.querySelector('#request').onclick=()=>{
+  const first=document.querySelector('#first-name').value.trim(),last=document.querySelector('#last-name').value.trim(),doc=document.querySelector('#document-id').value.trim(),consent=document.querySelector('#data-consent').checked;
+  if(!first||!last||!doc||!consent){alert('Completa nombre, apellido y cédula, y autoriza el uso de tus datos para continuar.');return;}
+  chosenPaymentMethod=null;modalContinue.disabled=true;modalDetail.classList.remove('show');modalDetail.innerHTML='';
+  document.querySelectorAll('[data-modal-method]').forEach(b=>b.classList.remove('active'));
+  paymentModal.classList.add('show');
+};
+document.querySelectorAll('[data-modal-method]').forEach(button=>button.addEventListener('click',()=>{
+  chosenPaymentMethod=button.dataset.modalMethod;
+  document.querySelectorAll('[data-modal-method]').forEach(b=>b.classList.toggle('active',b===button));
+  const info=modalPaymentInfo[chosenPaymentMethod];
+  modalDetail.innerHTML=`<b>${info.name}</b><p>Envía el pago a este número:</p><strong>${info.number}</strong><p>Total de tu selección: <b>${money(total())}</b></p>`;
+  modalDetail.classList.add('show');modalContinue.disabled=false;
+}));
+document.querySelector('#payment-modal-cancel').onclick=()=>paymentModal.classList.remove('show');
+modalContinue.onclick=()=>{
+  if(!chosenPaymentMethod)return;
+  const original=document.querySelector(`.pay-choice[data-method="${chosenPaymentMethod}"]`);
+  if(original)original.click();
+  paymentModal.classList.remove('show');
+  document.querySelector('#payment-proof').classList.add('show');
+  document.querySelector('#payment-proof').scrollIntoView({behavior:'smooth',block:'center'});
+};
 const proof=document.querySelector('#proof-file');
 proof.addEventListener('change',()=>{const f=proof.files[0];document.querySelector('#proof-name').textContent=f?`Archivo adjunto: ${f.name}`:'Aún no has adjuntado ningún archivo.';document.querySelector('#paid').disabled=!f});
 
