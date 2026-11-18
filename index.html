@@ -342,7 +342,7 @@ let chosenPaymentMethod=null;
 const paymentModal=document.querySelector('#payment-method-modal');
 const modalDetail=document.querySelector('#payment-modal-detail');
 const modalContinue=document.querySelector('#payment-modal-continue');
-const modalPaymentInfo={nequi:{name:'Nequi',number:'3248448958'},breb:{name:'BRE-B',number:'3248448958'}};
+const modalPaymentInfo={nequi:{name:'Nequi',number:'3135154931'},breb:{name:'BRE-B',number:'3135154931'}};
 document.querySelector('#request').onclick=()=>{
   const first=document.querySelector('#first-name').value.trim(),last=document.querySelector('#last-name').value.trim(),doc=document.querySelector('#document-id').value.trim(),consent=document.querySelector('#data-consent').checked;
   if(!first||!last||!doc||!consent){alert('Completa nombre, apellido y cédula, y autoriza el uso de tus datos para continuar.');return;}
@@ -399,7 +399,7 @@ document.querySelector('#paid').onclick=async()=>{
 };
 
 const paymentDetails=document.querySelector('#payment-details');
-const paymentMethods={nequi:{name:'Nequi',detail:'3248448958'},breb:{name:'BRE-B',detail:'3248448958'}};
+const paymentMethods={nequi:{name:'Nequi',detail:'3135154931'},breb:{name:'BRE-B',detail:'3135154931'}};
 document.querySelectorAll('.pay-choice').forEach(button=>button.addEventListener('click',()=>{
   document.querySelectorAll('.pay-choice').forEach(item=>{item.classList.remove('active');item.setAttribute('aria-pressed','false')});
   button.classList.add('active');button.setAttribute('aria-pressed','true');
