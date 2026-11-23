@@ -136,6 +136,7 @@ header{background:linear-gradient(135deg,#fff 0%,#f5f9ff 70%,#fff 100%);color:#1
 </style>
 </head>
 <body>
+<div id="test-mode-banner" role="status" style="display:none;position:sticky;top:0;z-index:9999;background:#7c2d12;color:#fff;text-align:center;padding:10px 14px;font-weight:900;font-size:13px;letter-spacing:.02em">MODO PRUEBA — boletas y operaciones simuladas; no representan ventas ni pagos reales.</div>
 <header><div class="wrap">
   <div class="top"><div class="brand">LOTERÍA <span>DE BOGOTÁ</span></div><div class="tag">SORTEO ESPECIAL</div></div>
   <section class="hero">
@@ -146,7 +147,7 @@ header{background:linear-gradient(135deg,#fff 0%,#f5f9ff 70%,#fff 100%);color:#1
     
     <div class="clock"><span id="live-date">Cargando fecha…</span><strong id="live-time">--:--:--</strong><span>Hora de Colombia · Bogotá</span></div>
     <div class="draw-countdowns" aria-label="Cuenta regresiva de los sorteos">
-      <div class="draw-clock"><span class="draw-name">PREMIO ANTICIPO</span><span class="draw-date" id="date-advance">Todos los jueves · 11:15 p. m.</span><div class="draw-time" id="countdown-advance"><span class="time-unit"><strong>--</strong><small>Días</small></span><span class="time-unit"><strong>--</strong><small>Horas</small></span><span class="time-unit"><strong>--</strong><small>Min</small></span><span class="time-unit"><strong>--</strong><small>Seg</small></span></div></div>
+      <div class="draw-clock"><span class="draw-name">PREMIO ANTICIPO</span><span class="draw-date" id="date-advance">Jueves 26 de noviembre de 2026 · 11:15 p. m.</span><div class="draw-time" id="countdown-advance"><span class="time-unit"><strong>--</strong><small>Días</small></span><span class="time-unit"><strong>--</strong><small>Horas</small></span><span class="time-unit"><strong>--</strong><small>Min</small></span><span class="time-unit"><strong>--</strong><small>Seg</small></span></div></div>
     </div>
   </section>
 </div></header>
@@ -171,7 +172,7 @@ header{background:linear-gradient(135deg,#fff 0%,#f5f9ff 70%,#fff 100%);color:#1
     <div class="legend"><span><i class="dot" style="background:#fffdf7;border:1px solid #cdbb8c"></i>Disponible</span><span><i class="dot" style="background:#171717"></i>Tu selección</span><span><i class="dot" style="background:#f7dddd;border:1px solid #e7b5b8"></i>Vendido (incluye apartados)</span></div>
     <div class="searchrow" style="margin:16px 0 8px"><input id="search" inputmode="numeric" maxlength="4" placeholder="Escribe el número que quieres (ej. 0123)" aria-label="Escribe el número que quieres buscar"><button class="btn" id="clear" type="button">Ver todos</button></div>
     <p class="muted" style="margin:0 0 10px">Escribe las cifras para encontrar tu número y luego tócalo para seleccionarlo.</p>
-    <div class="random-picker"><div><label for="random-quantity">Tickets al azar</label><input id="random-quantity" type="number" min="1" max="5000" value="3" inputmode="numeric"></div><button class="btn gold" id="random-pick" type="button" disabled>🎲 Elegir al azar</button><p class="muted">Elegiremos únicamente números disponibles. Esta acción reemplaza tu selección actual; podrás revisarla antes de continuar al pago.</p></div>
+    <div class="random-picker"><div><label for="random-quantity">Tickets al azar</label><input id="random-quantity" type="number" min="1" max="10000" value="3" inputmode="numeric"></div><button class="btn gold" id="random-pick" type="button" disabled>🎲 Elegir al azar</button><p class="muted">Elegiremos únicamente números disponibles. Esta acción reemplaza tu selección actual; podrás revisarla antes de continuar al pago.</p></div>
     <div id="grid" class="grid" aria-label="Selección de números"></div><p class="muted" id="range"></p>
     <div class="summary"><div><b id="count">0 números seleccionados</b><div class="selected-list" id="chosen">Aún no has seleccionado números.</div></div><div><div class="muted">Total estimado</div><div class="total" id="total">$0</div></div></div>
     <p class="muted">La promoción se aplica por cada grupo completo de 3 números: $95.000. Los números restantes cuestan $60.000 cada uno.</p>
@@ -247,22 +248,27 @@ header{background:linear-gradient(135deg,#fff 0%,#f5f9ff 70%,#fff 100%);color:#1
 const SUPABASE_URL = 'https://pfqacsivuunyvkltgcvw.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_NkSv5NR1qJv3fYGTBC-oUA_y15qPXcs';
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+// Modo de prueba aislado: activar con ?modo=prueba. Nunca escribe en Supabase.
+const TEST_MODE = new URLSearchParams(location.search).get('modo') === 'prueba';
+const TEST_STORAGE_KEY = 'sdroppys_demo_sold_v1';
+if(TEST_MODE) document.getElementById('test-mode-banner').style.display='block';
+function getTestSold(){
+  try { const saved=JSON.parse(localStorage.getItem(TEST_STORAGE_KEY)||'null'); if(Array.isArray(saved)&&saved.length>=7000)return new Set(saved); } catch(e){}
+  const pool=Array.from({length:10000},(_,n)=>n);
+  for(let i=0;i<7000;i++){let j=i+Math.floor(Math.random()*(pool.length-i));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  const chosen=pool.slice(0,7000).sort((a,b)=>a-b);
+  localStorage.setItem(TEST_STORAGE_KEY,JSON.stringify(chosen));
+  return new Set(chosen);
+}
+function saveTestSold(){localStorage.setItem(TEST_STORAGE_KEY,JSON.stringify([...unavailable.keys()].sort((a,b)=>a-b)));}
+
 
 // Reloj en vivo con zona horaria de Colombia.
 function updateClock(){const now=new Date();document.getElementById('live-date').textContent=new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(now);document.getElementById('live-time').textContent=new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true}).format(now)}
 updateClock();setInterval(updateClock,1000);
 
-// Sorteos recurrentes en hora de Colombia (UTC-5):
-// Anticipo: todos los jueves a las 11:15 p. m.
-// Premio mayor: todos los sábados a las 10:40 p. m.
-function nextWeeklyDraw(dayOfWeek,hour,minute){
-  const nowBogota=new Date(Date.now()-5*60*60*1000);
-  const todayUtc=Date.UTC(nowBogota.getUTCFullYear(),nowBogota.getUTCMonth(),nowBogota.getUTCDate());
-  let daysAhead=(dayOfWeek-nowBogota.getUTCDay()+7)%7;
-  let target=todayUtc+daysAhead*86400000+(hour+5)*3600000+minute*60000;
-  if(target<=Date.now()) target+=7*86400000;
-  return target;
-}
+// Fecha única del premio anticipo: jueves 26 de noviembre de 2026, 11:15 p. m. (hora Colombia).
+function advanceDrawDate(){ return Date.UTC(2026,10,27,4,15,0); }
 function updateCountdown(id,target){
   const el=document.getElementById(id);
   let ms=Math.max(0,target-Date.now());
@@ -273,8 +279,8 @@ function updateCountdown(id,target){
   el.querySelectorAll('strong').forEach((node,i)=>node.textContent=String(vals[i]).padStart(2,'0'));
 }
 function updateCountdowns(){
-  const advance=nextWeeklyDraw(4,23,15); // todos los jueves
-  document.getElementById('date-advance').textContent='Todos los jueves · próximo: '+new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',day:'numeric',month:'long'}).format(new Date(advance))+' · 11:15 p. m.';
+  const advance=advanceDrawDate();
+  document.getElementById('date-advance').textContent='Jueves 26 de noviembre de 2026 · 11:15 p. m.';
   updateCountdown('countdown-advance',advance);
 }
 updateCountdowns();setInterval(updateCountdowns,1000);
@@ -286,8 +292,18 @@ const money=n=>n.toLocaleString('es-CO',{style:'currency',currency:'COP',maximum
 function total(){const n=selected.size;return Math.floor(n/3)*95000+(n%3)*60000}
 function updateSummary(){document.querySelector('#count').textContent=`${selected.size} número${selected.size===1?'':'s'} seleccionado${selected.size===1?'':'s'}`;document.querySelector('#chosen').textContent=selected.size?[...selected].sort((a,b)=>a-b).map(n=>String(n).padStart(4,'0')).join(' · '):'Aún no has seleccionado números.';document.querySelector('#total').textContent=money(total());document.querySelector('#request').disabled=selected.size===0}
 function paintNumber(n){const b=grid.querySelector(`button[data-number="${n}"]`);if(!b)return;const status=unavailable.get(n);b.classList.remove('pending','reserved','sold','selected');b.disabled=!!status;b.title=status==='test'?'Vendido (simulación de prueba)':status?'Vendido (incluye número apartado)':'';if(status){b.classList.add('sold');b.setAttribute('aria-pressed','false')}else if(selected.has(n)){b.classList.add('selected');b.setAttribute('aria-pressed','true')}else{b.setAttribute('aria-pressed','false')}}
-function buildGrid(){const frag=document.createDocumentFragment();for(let n=0;n<5000;n++){const b=document.createElement('button');b.type='button';b.className='num';b.dataset.number=String(n);b.textContent=String(n).padStart(4,'0');b.setAttribute('aria-pressed','false');frag.appendChild(b)}grid.replaceChildren(frag);document.querySelector('#range').textContent='5.000 números: la disponibilidad se actualiza desde la base de datos. Los números apartados y comprados se muestran públicamente como VENDIDOS. Solo el administrador puede liberarlos desde Supabase.'}
+function buildGrid(){const frag=document.createDocumentFragment();for(let n=0;n<10000;n++){const b=document.createElement('button');b.type='button';b.className='num';b.dataset.number=String(n);b.textContent=String(n).padStart(4,'0');b.setAttribute('aria-pressed','false');frag.appendChild(b)}grid.replaceChildren(frag);document.querySelector('#range').textContent='10.000 números (del 0000 al 9999): la disponibilidad se actualiza desde la base de datos. Los números apartados y comprados se muestran públicamente como VENDIDOS. Solo el administrador puede liberarlos desde Supabase.'}
 async function loadAvailability(){
+  if(TEST_MODE){
+    unavailable.clear();
+    for(const n of getTestSold()) unavailable.set(n,'test');
+    for(const n of selected){if(unavailable.has(n))selected.delete(n)}
+    grid.querySelectorAll('.num').forEach(b=>paintNumber(Number(b.dataset.number)));
+    updateSummary(); availabilityLoaded=true;
+    document.querySelector('#random-pick').disabled=false;
+    document.querySelector('#range').textContent=`MODO PRUEBA: ${unavailable.size.toLocaleString('es-CO')} boletas simuladas como vendidas y ${(10000-unavailable.size).toLocaleString('es-CO')} disponibles. Estos datos solo se guardan en este navegador.`;
+    return;
+  }
   // Supabase pagina los resultados; cargar todos los registros evita tratar
   // como libres números existentes que quedaron fuera del primer bloque.
   const pageSize=1000;
@@ -311,7 +327,7 @@ async function loadAvailability(){
   for(const row of rows){
     const n=Number(row.number);
     const status=String(row.status||'').trim().toLowerCase();
-    if(Number.isInteger(n)&&n>=0&&n<5000&&['pending','reserved','temporarily_reserved','temporarily-reserved','temporarily reserved','sold','purchased','paid'].includes(status)){
+    if(Number.isInteger(n)&&n>=0&&n<10000&&['pending','reserved','temporarily_reserved','temporarily-reserved','temporarily reserved','sold','purchased','paid'].includes(status)){
       unavailable.set(n,status);
     }
   }
@@ -329,8 +345,8 @@ document.querySelector('#clear').onclick=()=>{search.value='';grid.querySelector
 document.querySelector('#random-pick').addEventListener('click',()=>{
   if(!availabilityLoaded){alert('Espera a que se cargue la disponibilidad de los números.');return;}
   const input=document.querySelector('#random-quantity');const qty=Number.parseInt(input.value,10);
-  if(!Number.isInteger(qty)||qty<1||qty>5000){alert('Elige una cantidad entre 1 y 5.000 tickets.');return;}
-  const pool=[];for(let n=0;n<5000;n++)if(!unavailable.has(n))pool.push(n);
+  if(!Number.isInteger(qty)||qty<1||qty>10000){alert('Elige una cantidad entre 1 y 10.000 tickets.');return;}
+  const pool=[];for(let n=0;n<10000;n++)if(!unavailable.has(n))pool.push(n);
   if(pool.length<qty){alert(`Solo quedan ${pool.length.toLocaleString('es-CO')} números disponibles.`);return;}
   // Fisher-Yates parcial con aleatoriedad criptográfica cuando está disponible.
   for(let i=0;i<qty;i++){let j=i;if(window.crypto&&crypto.getRandomValues){const r=new Uint32Array(1);crypto.getRandomValues(r);j=i+(r[0]%(pool.length-i));}else{j=i+Math.floor(Math.random()*(pool.length-i));}[pool[i],pool[j]]=[pool[j],pool[i]];}
@@ -381,6 +397,18 @@ document.querySelector('#paid').onclick=async()=>{
   const method=methodButton.dataset.method==='nequi'?'Nequi':'BRE-B';
   const numbers=[...selected].sort((a,b)=>a-b);
   const btn=document.querySelector('#paid');btn.disabled=true;btn.textContent='Apartando números…';
+  if(TEST_MODE){
+    try{
+      for(const n of numbers) unavailable.set(n,'test');
+      saveTestSold(); selected.clear();
+      grid.querySelectorAll('.num').forEach(b=>paintNumber(Number(b.dataset.number)));
+      updateSummary(); await loadAvailability();
+      document.querySelector('#payment-proof').classList.remove('show');
+      document.querySelector('#proof-name').textContent='Modo prueba: no se envió ni verificó ningún comprobante.';
+      alert(`Prueba completada: ${numbers.length} boleta(s) quedaron ocupadas en este navegador. No se registró ningún pago ni se modificó Supabase.`);
+    } finally {btn.disabled=!proof.files.length;btn.textContent='Enviar comprobante por WhatsApp';}
+    return;
+  }
   try{
     const {data,error}=await db.rpc('reserve_raffle_numbers',{
       p_numbers:numbers,p_first_name:first,p_last_name:last,p_document:doc,
@@ -410,7 +438,7 @@ document.querySelectorAll('.pay-choice').forEach(button=>button.addEventListener
 
 buildGrid();updateSummary();loadAvailability();
 // Sincronización en tiempo real para que todos vean los números ocupados.
-db.channel('raffle-number-changes').on('postgres_changes',{event:'*',schema:'public',table:'raffle_numbers'},()=>loadAvailability()).subscribe();
+if(!TEST_MODE) db.channel('raffle-number-changes').on('postgres_changes',{event:'*',schema:'public',table:'raffle_numbers'},()=>loadAvailability()).subscribe();
 </script>
 
 <a class="whatsapp-float" href="https://wa.me/573136260628?text=Hola%2C%20necesito%20ayuda%20con%20Loter%C3%ADa%20de%20Bogot%C3%A1" target="_blank" rel="noopener" aria-label="Contactar atención al cliente por WhatsApp"><span class="wa-icon" aria-hidden="true"><svg viewBox="0 0 32 32" role="img" aria-label=""><path d="M16.02 3.2A12.7 12.7 0 0 0 5.1 22.38L3.4 28.6l6.38-1.67A12.7 12.7 0 1 0 16.02 3.2Zm0 23.1c-2 0-3.96-.54-5.66-1.56l-.4-.24-3.78.99 1.01-3.68-.26-.42a10.47 10.47 0 1 1 9.09 4.91Zm5.75-7.85c-.31-.16-1.84-.91-2.12-1.02-.28-.1-.49-.16-.69.16-.21.31-.8 1.02-.98 1.23-.18.2-.36.23-.67.08-.31-.16-1.31-.49-2.5-1.55-.92-.82-1.55-1.84-1.73-2.15-.18-.31-.02-.48.14-.64.14-.14.31-.36.46-.54.15-.18.2-.31.31-.52.1-.2.05-.38-.03-.54-.08-.15-.69-1.67-.95-2.29-.25-.6-.5-.52-.69-.53h-.59c-.2 0-.54.08-.82.39-.28.31-1.08 1.06-1.08 2.58s1.11 2.99 1.27 3.19c.15.21 2.18 3.33 5.28 4.67.74.32 1.32.51 1.77.65.74.23 1.42.2 1.95.12.6-.09 1.84-.75 2.1-1.47.26-.72.26-1.34.18-1.47-.08-.13-.28-.2-.59-.36Z"/></svg></span></a>
